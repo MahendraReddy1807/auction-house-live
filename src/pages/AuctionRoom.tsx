@@ -145,6 +145,9 @@ const AuctionRoom = () => {
               .eq('id', playerData.id);
             
             setTimeLeft(30);
+            // Update local state with ACTIVE status
+            playerData.status = 'ACTIVE';
+            playerData.current_bid = playerData.players.base_price;
           }
           setCurrentPlayer(playerData);
         } else {
