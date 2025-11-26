@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Copy, Users, Trophy, Upload } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Copy, Users, Trophy, Upload, CheckCircle2, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -13,6 +14,7 @@ interface Team {
   logo_url: string | null;
   purse_left: number;
   participant_id: string;
+  is_ready: boolean;
   participants?: {
     username: string;
   };
@@ -28,6 +30,7 @@ const Lobby = () => {
   const [teamLogo, setTeamLogo] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const [myTeam, setMyTeam] = useState<Team | null>(null);
 
   const participantId = localStorage.getItem('participantId');
   const username = localStorage.getItem('username');
@@ -84,6 +87,7 @@ const Lobby = () => {
       // Check if current user has joined
       const userTeam = teamsData?.find(t => t.participant_id === participantId);
       setHasJoined(!!userTeam);
+      setMyTeam(userTeam || null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -143,7 +147,8 @@ const Lobby = () => {
           team_name: teamName,
           logo_url: logoUrl,
           initial_purse: 90,
-          purse_left: 90
+          purse_left: 90,
+          is_ready: false
         });
 
       if (error) throw error;
@@ -165,11 +170,45 @@ const Lobby = () => {
     }
   };
 
+  const toggleReady = async () => {
+    if (!myTeam) return;
+    
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({ is_ready: !myTeam.is_ready })
+        .eq('id', myTeam.id);
+
+      if (error) throw error;
+
+      toast({
+        title: myTeam.is_ready ? "Not Ready" : "Ready!",
+        description: myTeam.is_ready ? "You're not ready" : "You're ready to start",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleStartAuction = async () => {
     if (teams.length < room.min_users) {
       toast({
         title: "Not enough teams",
         description: `Need at least ${room.min_users} teams to start`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const notReadyTeams = teams.filter(t => !t.is_ready);
+    if (notReadyTeams.length > 0) {
+      toast({
+        title: "Teams not ready",
+        description: `${notReadyTeams.length} team(s) are not ready yet`,
         variant: "destructive",
       });
       return;
@@ -244,9 +283,9 @@ const Lobby = () => {
         </Card>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {/* Join Panel */}
-          {!hasJoined && (
-            <Card className="p-6 bg-card border-2 border-border md:col-span-1">
+          {/* Join/Ready Panel */}
+          <Card className="p-6 bg-card border-2 border-border md:col-span-1">
+            {!hasJoined ? (
               <div className="space-y-4">
                 <h2 className="text-xl font-bold">Join as Team</h2>
                 <Input
@@ -277,18 +316,49 @@ const Lobby = () => {
                   Join Auction
                 </Button>
               </div>
-            </Card>
-          )}
+            ) : (
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold">Your Team</h2>
+                <div className="p-4 bg-muted rounded-lg border border-border">
+                  <div className="font-bold mb-1">{myTeam?.team_name}</div>
+                  <div className="text-sm text-muted-foreground">{username}</div>
+                </div>
+                <Button
+                  onClick={toggleReady}
+                  className={`w-full font-bold ${
+                    myTeam?.is_ready 
+                      ? 'bg-secondary hover:bg-secondary/90' 
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                  }`}
+                >
+                  {myTeam?.is_ready ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      Ready
+                    </>
+                  ) : (
+                    <>
+                      <Circle className="w-5 h-5 mr-2" />
+                      Not Ready
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  All teams must be ready before starting
+                </p>
+              </div>
+            )}
+          </Card>
 
           {/* Teams List */}
-          <Card className={`p-6 bg-card border-2 border-border ${hasJoined ? 'md:col-span-3' : 'md:col-span-2'}`}>
+          <Card className="p-6 bg-card border-2 border-border md:col-span-2">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Users className="w-5 h-5" />
                   Teams ({teams.length}/{room.max_users})
                 </h2>
-                {room.host_id === participantId && teams.length >= room.min_users && (
+                {room.host_id === participantId && teams.length >= room.min_users && teams.every(t => t.is_ready) && (
                   <Button
                     onClick={handleStartAuction}
                     className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold"
@@ -316,7 +386,20 @@ const Lobby = () => {
                       </div>
                     )}
                     <div className="flex-1">
-                      <div className="font-bold">{team.team_name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold">{team.team_name}</div>
+                        {team.is_ready ? (
+                          <Badge className="bg-secondary text-secondary-foreground">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Ready
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            <Circle className="w-3 h-3 mr-1" />
+                            Not Ready
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         {team.participants?.username}
                       </div>

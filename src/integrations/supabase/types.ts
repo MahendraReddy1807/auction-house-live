@@ -307,6 +307,7 @@ export type Database = {
           created_at: string | null
           id: string
           initial_purse: number | null
+          is_ready: boolean | null
           logo_url: string | null
           participant_id: string | null
           purse_left: number | null
@@ -317,6 +318,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           initial_purse?: number | null
+          is_ready?: boolean | null
           logo_url?: string | null
           participant_id?: string | null
           purse_left?: number | null
@@ -327,6 +329,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           initial_purse?: number | null
+          is_ready?: boolean | null
           logo_url?: string | null
           participant_id?: string | null
           purse_left?: number | null
