@@ -215,16 +215,52 @@ const Results = () => {
                           className="p-3 bg-muted rounded-lg border border-secondary/50"
                         >
                           <div className="font-semibold text-sm">{player.players?.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground mb-1">
                             {player.players?.role.replace('_', ' ')} • ₹{player.price}Cr
                           </div>
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {player.players?.overall_score}
+                          <div className="flex gap-1 text-xs">
+                            <Badge variant="outline" className="text-xs">
+                              Bat: {player.players?.batting_score}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              Bowl: {player.players?.bowling_score}
+                            </Badge>
+                          </div>
+                          <Badge className="text-xs mt-1 bg-secondary">
+                            Overall: {player.players?.overall_score}
                           </Badge>
                         </div>
                       ))}
                     </div>
                   </div>
+
+                  {/* Full Squad */}
+                  {team.squad.length > team.playing_xi.length && (
+                    <div>
+                      <h4 className="font-bold mb-3 text-muted-foreground">
+                        Bench Players
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {team.squad
+                          .filter((sp: any) => !team.playing_xi.find((xi: any) => xi.id === sp.id))
+                          .map((player: any) => (
+                            <div
+                              key={player.id}
+                              className="p-2 bg-muted/50 rounded border border-border text-xs"
+                            >
+                              <div className="font-semibold truncate">{player.players?.name}</div>
+                              <div className="text-muted-foreground">
+                                {player.players?.role.replace('_', ' ')}
+                              </div>
+                              <div className="text-muted-foreground">₹{player.price}Cr</div>
+                              <Badge variant="outline" className="text-xs mt-1">
+                                {player.players?.overall_score}
+                              </Badge>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Impact Player */}
                   {team.impact_player && (
