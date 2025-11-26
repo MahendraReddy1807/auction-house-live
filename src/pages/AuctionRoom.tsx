@@ -49,6 +49,8 @@ const AuctionRoom = () => {
   const [timeLeft, setTimeLeft] = useState(30);
   const [myTeam, setMyTeam] = useState<Team | null>(null);
   const [bidHistory, setBidHistory] = useState<any[]>([]);
+  const [showSoldAnimation, setShowSoldAnimation] = useState(false);
+  const [soldInfo, setSoldInfo] = useState<{ price: number; teamName: string } | null>(null);
 
   const participantId = localStorage.getItem('participantId');
 
@@ -246,6 +248,11 @@ const AuctionRoom = () => {
     try {
       const soldPrice = currentPlayer.current_bid || currentPlayer.players.base_price;
       const soldToTeam = currentPlayer.current_bidder_team_id;
+      const soldTeamName = currentPlayer.teams?.team_name || 'No bids';
+
+      // Show sold animation
+      setSoldInfo({ price: soldPrice, teamName: soldTeamName });
+      setShowSoldAnimation(true);
 
       // Mark player as sold
       await supabase
@@ -279,10 +286,12 @@ const AuctionRoom = () => {
         }
       }
 
-      // Fetch next player
+      // Fetch next player after animation
       setTimeout(() => {
+        setShowSoldAnimation(false);
+        setSoldInfo(null);
         fetchAuctionData();
-      }, 2000);
+      }, 3000);
     } catch (error: any) {
       console.error(error);
     }
@@ -303,7 +312,32 @@ const AuctionRoom = () => {
   const progressPercent = (timeLeft / 30) * 100;
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
+    <div className="min-h-screen p-4 md:p-8 relative">
+      {/* Sold Animation Overlay */}
+      {showSoldAnimation && soldInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm animate-fade-in">
+          <div className="text-center space-y-6 animate-scale-in">
+            <div className="relative">
+              <div className="text-8xl font-black text-secondary animate-pulse">
+                SOLD!
+              </div>
+              <div className="absolute inset-0 text-8xl font-black text-secondary/20 blur-xl animate-pulse">
+                SOLD!
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-4xl font-bold text-foreground">
+                ₹{soldInfo.price}Cr
+              </div>
+              <div className="text-2xl text-muted-foreground">
+                to {soldInfo.teamName}
+              </div>
+            </div>
+            <Award className="w-24 h-24 text-secondary mx-auto animate-bounce" />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <Card className="p-4 bg-card border-2 border-border">
