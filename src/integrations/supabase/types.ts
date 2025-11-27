@@ -180,6 +180,9 @@ export type Database = {
       }
       rooms: {
         Row: {
+          bid_increment_large: number | null
+          bid_increment_medium: number | null
+          bid_increment_small: number | null
           created_at: string | null
           host_id: string | null
           id: string
@@ -187,8 +190,12 @@ export type Database = {
           min_users: number | null
           room_code: string
           status: Database["public"]["Enums"]["room_status"] | null
+          timer_duration: number | null
         }
         Insert: {
+          bid_increment_large?: number | null
+          bid_increment_medium?: number | null
+          bid_increment_small?: number | null
           created_at?: string | null
           host_id?: string | null
           id?: string
@@ -196,8 +203,12 @@ export type Database = {
           min_users?: number | null
           room_code: string
           status?: Database["public"]["Enums"]["room_status"] | null
+          timer_duration?: number | null
         }
         Update: {
+          bid_increment_large?: number | null
+          bid_increment_medium?: number | null
+          bid_increment_small?: number | null
           created_at?: string | null
           host_id?: string | null
           id?: string
@@ -205,6 +216,7 @@ export type Database = {
           min_users?: number | null
           room_code?: string
           status?: Database["public"]["Enums"]["room_status"] | null
+          timer_duration?: number | null
         }
         Relationships: [
           {

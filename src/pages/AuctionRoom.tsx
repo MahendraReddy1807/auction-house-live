@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Clock, Hammer, TrendingUp, Award } from "lucide-react";
+import { Trophy, Clock, Hammer, TrendingUp, Award, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Player {
   id: string;
@@ -51,6 +52,7 @@ const AuctionRoom = () => {
   const [bidHistory, setBidHistory] = useState<any[]>([]);
   const [showSoldAnimation, setShowSoldAnimation] = useState(false);
   const [soldInfo, setSoldInfo] = useState<{ price: number; teamName: string } | null>(null);
+  const [soldPlayers, setSoldPlayers] = useState<any[]>([]);
 
   const participantId = localStorage.getItem('participantId');
 
@@ -74,6 +76,7 @@ const AuctionRoom = () => {
         },
         () => {
           fetchAuctionData();
+          fetchSoldPlayers();
         }
       )
       .on(
@@ -114,6 +117,19 @@ const AuctionRoom = () => {
     }
   }, [timeLeft, currentPlayer]);
 
+  const fetchSoldPlayers = async () => {
+    if (!room) return;
+
+    const { data } = await supabase
+      .from('auction_players')
+      .select('*, players(*), teams!sold_to_team_id(team_name)')
+      .eq('room_id', room.id)
+      .eq('status', 'COMPLETED')
+      .order('created_at', { ascending: false });
+
+    setSoldPlayers(data || []);
+  };
+
   const fetchAuctionData = async () => {
     try {
       const { data: roomData } = await supabase
@@ -146,7 +162,7 @@ const AuctionRoom = () => {
               })
               .eq('id', playerData.id);
             
-            setTimeLeft(30);
+            setTimeLeft(roomData.timer_duration || 30);
             // Update local state with ACTIVE status
             playerData.status = 'ACTIVE';
             playerData.current_bid = playerData.players.base_price;
@@ -159,6 +175,7 @@ const AuctionRoom = () => {
 
         await fetchTeamsData();
         await fetchBidHistory();
+        await fetchSoldPlayers();
       }
     } catch (error: any) {
       console.error(error);
@@ -227,7 +244,7 @@ const AuctionRoom = () => {
         })
         .eq('id', currentPlayer.id);
 
-      setTimeLeft(30); // Reset timer
+      setTimeLeft(room.timer_duration || 30); // Reset timer
       
       toast({
         title: "Bid Placed!",
@@ -309,7 +326,14 @@ const AuctionRoom = () => {
   }
 
   const player = currentPlayer.players;
-  const progressPercent = (timeLeft / 30) * 100;
+  const progressPercent = (timeLeft / (room.timer_duration || 30)) * 100;
+
+  // Prepare chart data
+  const chartData = soldPlayers.slice(0, 10).reverse().map(sp => ({
+    name: sp.players.name.split(' ').slice(-1)[0],
+    price: Number(sp.sold_price),
+    team: sp.teams?.team_name || 'Unsold'
+  }));
 
   return (
     <div className="min-h-screen p-4 md:p-8 relative">
@@ -423,25 +447,25 @@ const AuctionRoom = () => {
               {myTeam && currentPlayer.status === 'ACTIVE' && (
                 <div className="grid grid-cols-3 gap-3">
                   <Button
-                    onClick={() => handleBid(0.5)}
+                    onClick={() => handleBid(room.bid_increment_small || 0.5)}
                     className="h-14 text-lg font-bold bg-secondary hover:bg-secondary/90"
                   >
                     <Hammer className="w-5 h-5 mr-2" />
-                    +0.5Cr
+                    +{room.bid_increment_small || 0.5}Cr
                   </Button>
                   <Button
-                    onClick={() => handleBid(1)}
+                    onClick={() => handleBid(room.bid_increment_medium || 1)}
                     className="h-14 text-lg font-bold bg-secondary hover:bg-secondary/90"
                   >
                     <Hammer className="w-5 h-5 mr-2" />
-                    +1Cr
+                    +{room.bid_increment_medium || 1}Cr
                   </Button>
                   <Button
-                    onClick={() => handleBid(2)}
+                    onClick={() => handleBid(room.bid_increment_large || 2)}
                     className="h-14 text-lg font-bold bg-secondary hover:bg-secondary/90"
                   >
                     <Hammer className="w-5 h-5 mr-2" />
-                    +2Cr
+                    +{room.bid_increment_large || 2}Cr
                   </Button>
                 </div>
               )}
@@ -507,6 +531,58 @@ const AuctionRoom = () => {
             </Card>
           </div>
         </div>
+
+        {/* Purchase History Chart */}
+        {soldPlayers.length > 0 && (
+          <Card className="p-6 bg-card border-2 border-border">
+            <h3 className="font-bold mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-secondary" />
+              Recent Purchases
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" className="text-muted-foreground" />
+                <YAxis className="text-muted-foreground" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number) => [`₹${value}Cr`, 'Price']}
+                  labelFormatter={(label) => `Player: ${label}`}
+                />
+                <Legend />
+                <Bar dataKey="price" fill="hsl(var(--secondary))" name="Price (Cr)" />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 bg-muted rounded-lg text-center">
+                <div className="text-2xl font-bold text-secondary">{soldPlayers.length}</div>
+                <div className="text-xs text-muted-foreground">Players Sold</div>
+              </div>
+              <div className="p-3 bg-muted rounded-lg text-center">
+                <div className="text-2xl font-bold text-secondary">
+                  ₹{soldPlayers.reduce((sum, p) => sum + Number(p.sold_price || 0), 0).toFixed(1)}Cr
+                </div>
+                <div className="text-xs text-muted-foreground">Total Spent</div>
+              </div>
+              <div className="p-3 bg-muted rounded-lg text-center">
+                <div className="text-2xl font-bold text-secondary">
+                  ₹{soldPlayers.length > 0 ? (soldPlayers.reduce((sum, p) => sum + Number(p.sold_price || 0), 0) / soldPlayers.length).toFixed(1) : 0}Cr
+                </div>
+                <div className="text-xs text-muted-foreground">Avg Price</div>
+              </div>
+              <div className="p-3 bg-muted rounded-lg text-center">
+                <div className="text-2xl font-bold text-secondary">
+                  ₹{soldPlayers.length > 0 ? Math.max(...soldPlayers.map(p => Number(p.sold_price || 0))).toFixed(1) : 0}Cr
+                </div>
+                <div className="text-xs text-muted-foreground">Highest Bid</div>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

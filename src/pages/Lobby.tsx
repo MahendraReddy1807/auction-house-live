@@ -31,6 +31,8 @@ const Lobby = () => {
   const [loading, setLoading] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [myTeam, setMyTeam] = useState<Team | null>(null);
+  const [timerDuration, setTimerDuration] = useState(30);
+  const [bidIncrements, setBidIncrements] = useState({ small: 0.5, medium: 1, large: 2 });
 
   const participantId = localStorage.getItem('participantId');
   const username = localStorage.getItem('username');
@@ -75,6 +77,12 @@ const Lobby = () => {
 
       if (roomError) throw roomError;
       setRoom(roomData);
+      setTimerDuration(roomData.timer_duration || 30);
+      setBidIncrements({
+        small: roomData.bid_increment_small || 0.5,
+        medium: roomData.bid_increment_medium || 1,
+        large: roomData.bid_increment_large || 2
+      });
 
       const { data: teamsData, error: teamsError } = await supabase
         .from('teams')
@@ -194,6 +202,35 @@ const Lobby = () => {
     }
   };
 
+  const updateAuctionSettings = async () => {
+    if (room.host_id !== participantId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .update({
+          timer_duration: timerDuration,
+          bid_increment_small: bidIncrements.small,
+          bid_increment_medium: bidIncrements.medium,
+          bid_increment_large: bidIncrements.large
+        })
+        .eq('id', room.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Settings Updated",
+        description: "Auction settings have been saved",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleStartAuction = async () => {
     if (teams.length < room.min_users) {
       toast({
@@ -284,7 +321,8 @@ const Lobby = () => {
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* Join/Ready Panel */}
-          <Card className="p-6 bg-card border-2 border-border md:col-span-1">
+          <div className="space-y-6">
+            <Card className="p-6 bg-card border-2 border-border">
             {!hasJoined ? (
               <div className="space-y-4">
                 <h2 className="text-xl font-bold">Join as Team</h2>
@@ -348,7 +386,66 @@ const Lobby = () => {
                 </p>
               </div>
             )}
-          </Card>
+            </Card>
+
+            {/* Host Settings */}
+            {room.host_id === participantId && (
+              <Card className="p-6 bg-card border-2 border-border">
+                <h2 className="text-xl font-bold mb-4">Auction Settings</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-muted-foreground">Timer Duration (seconds)</label>
+                    <Input
+                      type="number"
+                      min="10"
+                      max="120"
+                      value={timerDuration}
+                      onChange={(e) => setTimerDuration(Number(e.target.value))}
+                      className="bg-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Bid Increments (Cr)</label>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={bidIncrements.small}
+                        onChange={(e) => setBidIncrements({...bidIncrements, small: Number(e.target.value)})}
+                        className="bg-input"
+                        placeholder="Small"
+                      />
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={bidIncrements.medium}
+                        onChange={(e) => setBidIncrements({...bidIncrements, medium: Number(e.target.value)})}
+                        className="bg-input"
+                        placeholder="Medium"
+                      />
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={bidIncrements.large}
+                        onChange={(e) => setBidIncrements({...bidIncrements, large: Number(e.target.value)})}
+                        className="bg-input"
+                        placeholder="Large"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={updateAuctionSettings}
+                    className="w-full bg-secondary hover:bg-secondary/90"
+                  >
+                    Save Settings
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
 
           {/* Teams List */}
           <Card className="p-6 bg-card border-2 border-border md:col-span-2">
