@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Clock, Hammer, TrendingUp, Award, DollarSign } from "lucide-react";
+import { Trophy, Clock, Hammer, TrendingUp, Award, DollarSign, Pause, Play, GitCompare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ActivityFeed } from "@/components/ActivityFeed";
+import { PlayerComparison } from "@/components/PlayerComparison";
+import { useState as useStateReact } from "react";
 
 interface Player {
   id: string;
@@ -53,6 +56,8 @@ const AuctionRoom = () => {
   const [showSoldAnimation, setShowSoldAnimation] = useState(false);
   const [soldInfo, setSoldInfo] = useState<{ price: number; teamName: string } | null>(null);
   const [soldPlayers, setSoldPlayers] = useState<any[]>([]);
+  const [comparisonPlayer, setComparisonPlayer] = useState<Player | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
 
   const participantId = localStorage.getItem('participantId');
 
@@ -210,8 +215,54 @@ const AuctionRoom = () => {
     setBidHistory(data || []);
   };
 
+  const logActivity = async (type: string, description: string) => {
+    if (!room) return;
+    
+    await supabase.from('auction_activity').insert({
+      room_id: room.id,
+      activity_type: type,
+      description
+    });
+  };
+
+  const togglePause = async () => {
+    if (room.host_id !== participantId || !room) return;
+    
+    try {
+      const newPauseState = !room.is_paused;
+      const { error } = await supabase
+        .from('rooms')
+        .update({ is_paused: newPauseState })
+        .eq('id', room.id);
+
+      if (error) throw error;
+
+      await logActivity('ACTIVITY', newPauseState ? '⏸️ Auction paused by host' : '▶️ Auction resumed by host');
+      
+      toast({
+        title: newPauseState ? "Auction Paused" : "Auction Resumed",
+        description: newPauseState ? "Bidding is paused" : "Bidding has resumed",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleBid = async (increment: number) => {
     if (!currentPlayer || !myTeam) return;
+    
+    if (room?.is_paused) {
+      toast({
+        title: "Auction Paused",
+        description: "Bidding is currently paused",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const newBid = (currentPlayer.current_bid || currentPlayer.players.base_price) + increment;
 
@@ -245,6 +296,8 @@ const AuctionRoom = () => {
         .eq('id', currentPlayer.id);
 
       setTimeLeft(room.timer_duration || 30); // Reset timer
+      
+      await logActivity('BID', `${myTeam.team_name} bid ₹${newBid}Cr for ${currentPlayer.players.name}`);
       
       toast({
         title: "Bid Placed!",
@@ -302,6 +355,12 @@ const AuctionRoom = () => {
             .eq('id', soldToTeam);
         }
       }
+
+      // Log activity
+      await logActivity(
+        'SOLD', 
+        `🎯 ${currentPlayer.players.name} sold to ${soldTeamName} for ₹${soldPrice}Cr`
+      );
 
       // Fetch next player after animation
       setTimeout(() => {
@@ -373,13 +432,39 @@ const AuctionRoom = () => {
                 <p className="text-sm text-muted-foreground">Room: {roomCode}</p>
               </div>
             </div>
-            {myTeam && (
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">{myTeam.team_name}</div>
-                <div className="text-2xl font-bold text-secondary">₹{myTeam.purse_left}Cr</div>
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {room.host_id === participantId && (
+                <Button
+                  onClick={togglePause}
+                  variant="outline"
+                  className="border-secondary hover:bg-secondary/10"
+                >
+                  {room.is_paused ? (
+                    <>
+                      <Play className="w-4 h-4 mr-2" />
+                      Resume
+                    </>
+                  ) : (
+                    <>
+                      <Pause className="w-4 h-4 mr-2" />
+                      Pause
+                    </>
+                  )}
+                </Button>
+              )}
+              {myTeam && (
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">{myTeam.team_name}</div>
+                  <div className="text-2xl font-bold text-secondary">₹{myTeam.purse_left}Cr</div>
+                </div>
+              )}
+            </div>
           </div>
+          {room.is_paused && (
+            <div className="mt-3 p-2 bg-destructive/10 border border-destructive rounded text-center text-sm font-semibold">
+              ⏸️ Auction is paused
+            </div>
+          )}
         </Card>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -404,9 +489,22 @@ const AuctionRoom = () => {
 
               {/* Player Details */}
               <div className="text-center space-y-4">
-                <Badge variant="outline" className="text-lg px-4 py-1">
-                  {player.role.replace('_', ' ')}
-                </Badge>
+                <div className="flex items-center justify-center gap-2">
+                  <Badge variant="outline" className="text-lg px-4 py-1">
+                    {player.role.replace('_', ' ')}
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setComparisonPlayer(player);
+                      setShowComparison(true);
+                    }}
+                    className="border-accent hover:bg-accent/10"
+                  >
+                    <GitCompare className="w-4 h-4" />
+                  </Button>
+                </div>
                 <h2 className="text-4xl font-black">{player.name}</h2>
                 <div className="flex items-center justify-center gap-4 text-muted-foreground">
                   <span>🏏 {player.country}</span>
@@ -505,11 +603,14 @@ const AuctionRoom = () => {
               </div>
             </Card>
 
+            {/* Activity Feed */}
+            <ActivityFeed roomId={room.id} />
+
             {/* Bid History */}
             <Card className="p-4 bg-card border-2 border-border">
               <h3 className="font-bold mb-4 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-accent" />
-                Recent Bids
+                Current Player Bids
               </h3>
               <div className="space-y-2">
                 {bidHistory.length > 0 ? (
@@ -582,6 +683,16 @@ const AuctionRoom = () => {
               </div>
             </div>
           </Card>
+        )}
+
+        {/* Player Comparison Modal */}
+        {comparisonPlayer && soldPlayers.length > 0 && (
+          <PlayerComparison
+            open={showComparison}
+            onOpenChange={setShowComparison}
+            player1={comparisonPlayer}
+            player2={soldPlayers[0]?.players || null}
+          />
         )}
       </div>
     </div>
