@@ -3,8 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Award, TrendingUp, Home } from "lucide-react";
+import { Trophy, Award, TrendingUp, Home, BarChart3, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeamAnalytics } from "@/components/TeamAnalytics";
 
 interface TeamResult {
   id: string;
@@ -23,6 +25,7 @@ const Results = () => {
   const [teams, setTeams] = useState<TeamResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [bestTeam, setBestTeam] = useState<TeamResult | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<TeamResult | null>(null);
 
   useEffect(() => {
     fetchResults();
@@ -128,11 +131,24 @@ const Results = () => {
           </Card>
         )}
 
-        {/* Teams Results */}
-        <div className="space-y-6">
-          {teams
-            .sort((a, b) => (b.rating?.overall_rating || 0) - (a.rating?.overall_rating || 0))
-            .map((team, index) => (
+        {/* Analytics Tab */}
+        <Tabs defaultValue="teams" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="teams">
+              <Users className="w-4 h-4 mr-2" />
+              Teams Overview
+            </TabsTrigger>
+            <TabsTrigger value="analytics">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Team Analytics
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="teams" className="space-y-6">
+            {/* Teams Results */}
+            {teams
+              .sort((a, b) => (b.rating?.overall_rating || 0) - (a.rating?.overall_rating || 0))
+              .map((team, index) => (
               <Card 
                 key={team.id}
                 className={`p-6 bg-card border-2 ${
@@ -281,7 +297,43 @@ const Results = () => {
                 </div>
               </Card>
             ))}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            {/* Team Selection */}
+            <Card className="p-4 bg-card border-2 border-border">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold">Select Team:</span>
+                {teams.map((team) => (
+                  <Button
+                    key={team.id}
+                    variant={selectedTeam?.id === team.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedTeam(team)}
+                    className={selectedTeam?.id === team.id ? "bg-secondary" : ""}
+                  >
+                    {team.team_name}
+                  </Button>
+                ))}
+              </div>
+            </Card>
+
+            {/* Team Analytics Display */}
+            {selectedTeam ? (
+              <TeamAnalytics
+                teamName={selectedTeam.team_name}
+                players={selectedTeam.squad}
+                purseSpent={90 - selectedTeam.purse_left}
+                totalPlayers={selectedTeam.squad.length}
+              />
+            ) : (
+              <Card className="p-12 bg-card border-2 border-border text-center">
+                <Trophy className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Select a team to view analytics</p>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

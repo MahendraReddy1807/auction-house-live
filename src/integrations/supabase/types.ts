@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      auction_activity: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          description: string
+          id: string
+          metadata: Json | null
+          room_id: string | null
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          description: string
+          id?: string
+          metadata?: Json | null
+          room_id?: string | null
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          metadata?: Json | null
+          room_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auction_activity_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auction_players: {
         Row: {
           bid_count: number | null
@@ -186,6 +221,7 @@ export type Database = {
           created_at: string | null
           host_id: string | null
           id: string
+          is_paused: boolean | null
           max_users: number | null
           min_users: number | null
           room_code: string
@@ -199,6 +235,7 @@ export type Database = {
           created_at?: string | null
           host_id?: string | null
           id?: string
+          is_paused?: boolean | null
           max_users?: number | null
           min_users?: number | null
           room_code: string
@@ -212,6 +249,7 @@ export type Database = {
           created_at?: string | null
           host_id?: string | null
           id?: string
+          is_paused?: boolean | null
           max_users?: number | null
           min_users?: number | null
           room_code?: string
